@@ -1,2 +1,0 @@
-# KASM-POC
-kasm poc
