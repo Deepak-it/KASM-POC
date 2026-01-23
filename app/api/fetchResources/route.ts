@@ -3,12 +3,23 @@ import { EC2Client, DescribeInstancesCommand } from '@aws-sdk/client-ec2';
 
 export async function GET() {
   try {
+    // Check if AWS credentials are available
+    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.',
+        },
+        { status: 500 }
+      );
+    }
+
     // Configure AWS credentials from environment variables
     const client = new EC2Client({
       region: process.env.AWS_REGION || 'us-east-2',
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       },
     });
 
