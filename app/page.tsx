@@ -1,65 +1,88 @@
-import Image from "next/image";
+'use client'
 
+import { useState } from "react";
+import { signIn, signOut, useSession } from "next-auth/react";
+import axios from "axios";
 export default function Home() {
+  const { data: session, status } = useSession();
+  const [resources, setResources] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  function handleLoginGoogle() {
+    signIn("google", { callbackUrl: "/" })
+  }
+
+  async function handleRetrieveResources() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get('/api/fetchResources');
+      setResources(response.data);
+    } catch (err) {
+      const errorMessage: any = err instanceof Error ? err.message : 'Failed to fetch resources';
+      setError(errorMessage);
+      console.error('Error fetching resources:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (status === "loading") {
+    return <div style={{ textAlign: "center", marginTop: "100px" }}>Loading...</div>;
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div style={{ textAlign: "center", marginTop: "100px" }}>
+      {!session ? (
+        <>
+          <h2>Login</h2>
+          <button
+            onClick={handleLoginGoogle}
+            style={{
+              padding: "10px 20px",
+              fontSize: "16px",
+              cursor: "pointer",
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Sign in with Google
+          </button>
+        </>
+      ) : (
+        <>
+          <h2>Welcome, {session.user?.name || session.user?.email || 'User'}!</h2>
+
+          <button
+            onClick={handleRetrieveResources}
+            disabled={loading}
+            style={{
+              padding: "10px 20px",
+              fontSize: "16px",
+              cursor: loading ? "not-allowed" : "pointer",
+              marginBottom: "20px",
+            }}
           >
-            Documentation
-          </a>
-        </div>
-      </main>
+            {loading ? "Retrieving..." : "Retrieve Resources"}
+          </button>
+
+          <br />
+          <button onClick={() => signOut()}>
+            Logout
+          </button>
+
+          {error && (
+            <div style={{ color: "red", marginTop: "20px" }}>
+              Error: {error}
+            </div>
+          )}
+
+          {resources && (
+            <div style={{ marginTop: "20px", textAlign: "left", display: "inline-block" }}>
+              <h3>Resources:</h3>
+              <pre>{JSON.stringify(resources, null, 2)}</pre>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
