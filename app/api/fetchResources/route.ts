@@ -4,7 +4,7 @@ import { EC2Client, DescribeInstancesCommand } from '@aws-sdk/client-ec2';
 export async function GET() {
   try {
     // Check if AWS credentials are available
-    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+    if (!process.env.AWS_ACCESS_KEY_ID_ENV || !process.env.AWS_SECRET_ACCESS_KEY_ENV) {
       return NextResponse.json(
         {
           success: false,
@@ -18,8 +18,8 @@ export async function GET() {
     const client = new EC2Client({
       region: process.env.AWS_REGION || 'us-east-2',
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID_ENV,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_ENV,
       },
     });
 
