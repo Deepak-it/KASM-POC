@@ -18,8 +18,8 @@ export default function Home() {
       const response = await axios.get('/api/fetchResources');
       setResources(response.data);
     } catch (err) {
-      const errorMessage: any =
-        err instanceof Error ? err.message : 'Failed to fetch resources';
+      const errorMessage =
+      err instanceof Error ? err.message : "Failed to fetch resources";
       setError(errorMessage);
       console.error('Error fetching resources:', err);
     } finally {
