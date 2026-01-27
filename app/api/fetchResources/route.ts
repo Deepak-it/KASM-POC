@@ -13,14 +13,9 @@ export async function GET() {
         { status: 500 }
       );
     }
-
-    // Configure AWS credentials from environment variables
+    
     const client = new EC2Client({
-      region: process.env.AWS_REGION || 'us-east-2',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID_ENV,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_ENV,
-      },
+      region: process.env.AWS_REGION || "us-east-2",
     });
 
     // Fetch EC2 instances
