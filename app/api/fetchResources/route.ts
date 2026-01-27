@@ -15,7 +15,7 @@ export async function GET() {
     }
     
     const client = new EC2Client({
-      region: process.env.AWS_REGION || "us-east-2",
+      region: process.env.AWS_REGION || "ap-south-1",
     });
 
     // Fetch EC2 instances
