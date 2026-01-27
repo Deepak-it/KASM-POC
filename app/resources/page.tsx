@@ -41,7 +41,7 @@ export default function ResourcesPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ pocName: projectName }),
+                body: JSON.stringify({ pocName: projectName, aws_region: region }),
             })
 
             const data = await res.json()
