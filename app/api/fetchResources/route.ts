@@ -3,16 +3,6 @@ import { EC2Client, DescribeInstancesCommand } from '@aws-sdk/client-ec2';
 
 export async function GET() {
   try {
-    // Check if AWS credentials are available
-    if (!process.env.AWS_ACCESS_KEY_ID_ENV || !process.env.AWS_SECRET_ACCESS_KEY_ENV) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables.',
-        },
-        { status: 500 }
-      );
-    }
     
     const client = new EC2Client({
       region: process.env.AWS_REGION || "ap-south-1",

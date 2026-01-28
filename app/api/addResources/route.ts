@@ -17,14 +17,6 @@ export async function POST(req: Request) {
       aws_region = process.env.AWS_REGION
     } = body;
 
-    // 🔐 AWS credentials check
-    if (!process.env.AWS_ACCESS_KEY_ID_ENV || !process.env.AWS_SECRET_ACCESS_KEY_ENV) {
-      return NextResponse.json(
-        { success: false, error: 'AWS credentials not configured' },
-        { status: 500 }
-      );
-    }
-
     const client = new EC2Client({ region: aws_region || 'ap-south-1' });
 
     // 🚀 Cloud-init script for Kasm Workspaces with swap, Docker, Docker Compose
@@ -115,7 +107,7 @@ echo "==== Kasm installation completed successfully ===="
         {
           ResourceType: 'instance',
           Tags: [
-            { Key: 'Name', Value: 'Kasm-Server' },
+            { Key: 'Name', Value: pocName },
             { Key: 'Project', Value: pocName || 'Kasm POC' },
             { Key: 'Owner', Value: 'Puneet Bunet' },
           ],
