@@ -14,25 +14,31 @@ export async function POST(req: Request) {
       SubnetId,
       MinCount = 1,
       MaxCount = 1,
-      aws_region = process.env.AWS_REGION
+      aws_region = process.env.AWS_REGION || 'ap-south-1',
     } = body;
 
-    const client = new EC2Client({ region: aws_region || 'ap-south-1' });
-
-    // 🚀 Cloud-init script for Kasm Workspaces with swap, Docker, Docker Compose
-    const kasmUserData = installKasm
-      ? Buffer.from(`#!/bin/bash
+    const client = new EC2Client({ region: aws_region });
+    const HOSTED_ZONE_ID=process.env.ROUTE_53_HOSTED_ZONE_ID
+const kasmUserData = installKasm
+  ? Buffer.from(`#!/bin/bash
 LOG=/var/log/kasm-install.log
 exec > >(tee -a $LOG) 2>&1
+set -e
 
-echo "==== Kasm 1.18.1 automated installation started ===="
+echo "==== Kasm Full Auto Setup Started ===="
 
-# 0️⃣ Update system
+# ---------------- CONFIG ----------------
+SUBDOMAIN="ss09"
+BASE_DOMAIN="poc.saas.prezm.com"
+DOMAIN="$SUBDOMAIN.$BASE_DOMAIN"
+REGION="ap-south-1"
+HOSTED_ZONE_ID="${HOSTED_ZONE_ID}"
+
+# ---------------- SYSTEM UPDATE ----------------
 apt update -y && apt upgrade -y
 
-# 1️⃣ Create swap (8GB) for stability
+# ---------------- SWAP (8GB) ----------------
 if ! swapon --show | grep -q '/swapfile'; then
-  echo "Creating 8GB swap file..."
   fallocate -l 8G /swapfile
   chmod 600 /swapfile
   mkswap /swapfile
@@ -40,62 +46,136 @@ if ! swapon --show | grep -q '/swapfile'; then
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
-# 2️⃣ Install required packages
-apt install -y apt-transport-https ca-certificates curl software-properties-common lsb-release gnupg
+# ---------------- PACKAGES ----------------
+apt install -y curl unzip jq certbot awscli docker.io dnsutils
 
-# 3️⃣ Install Docker (>=25) from official repo
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
-apt update -y
-apt install -y docker-ce docker-ce-cli containerd.io
-
-# Enable Docker service
 systemctl enable docker
 systemctl start docker
 
-# 4️⃣ Install Docker Compose (>=2.40)
+# ---------------- DOCKER COMPOSE ----------------
 DOCKER_COMPOSE_VERSION=2.40.2
-curl -SL "https://github.com/docker/compose/releases/download/v${process.env.DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+curl -SL "https://github.com/docker/compose/releases/download/v$DOCKER_COMPOSE_VERSION/docker-compose-linux-x86_64" \
+  -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
-ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose || true
+ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 
-# 5️⃣ Ensure required storage (Kasm default: /var/lib/docker >= 75GB)
-ROOT_DISK_SIZE=$(df -BG / | tail -1 | awk '{print $2}' | sed 's/G//')
-if [ "$ROOT_DISK_SIZE" -lt 75 ]; then
-  echo "WARNING: Root disk size is less than 75GB. Kasm installation may fail."
-fi
-
-# 6️⃣ Change to tmp directory and download Kasm
+# ---------------- INSTALL KASM ----------------
 cd /tmp
 curl -O https://kasm-static-content.s3.amazonaws.com/kasm_release_1.18.1.tar.gz
 tar -xf kasm_release_1.18.1.tar.gz
 
-# 7️⃣ Run Kasm installer unattended
 export KASM_EULA=accept
-export KASM_SWAP_AUTO=true
 bash kasm_release/install.sh --accept-eula --swap-size 8192
 
-# 8️⃣ Ensure Kasm service starts
-systemctl enable kasm
-systemctl start kasm
+echo "Waiting for Kasm containers..."
+sleep 60
 
-echo "==== Kasm installation completed successfully ===="
-`).toString('base64')
-      : undefined;
+# ---------------- ELASTIC IP (REUSE SAFE) ----------------
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
+ALLOC_ID=$(aws ec2 describe-addresses \
+  --filters Name=instance-id,Values="$INSTANCE_ID" \
+  --region "$REGION" \
+  --query 'Addresses[0].AllocationId' \
+  --output text)
+
+if [ "$ALLOC_ID" = "None" ] || [ -z "$ALLOC_ID" ]; then
+  echo "Allocating new Elastic IP..."
+  ALLOC_ID=$(aws ec2 allocate-address \
+    --domain vpc \
+    --region "$REGION" \
+    --query AllocationId \
+    --output text)
+
+  aws ec2 associate-address \
+    --instance-id "$INSTANCE_ID" \
+    --allocation-id "$ALLOC_ID" \
+    --region "$REGION"
+else
+  echo "Reusing existing Elastic IP"
+fi
+
+PUBLIC_IP=$(aws ec2 describe-addresses \
+  --allocation-ids "$ALLOC_ID" \
+  --region "$REGION" \
+  --query 'Addresses[0].PublicIp' \
+  --output text)
+
+echo "Elastic IP = $PUBLIC_IP"
+
+# ---------------- ROUTE53 DNS ----------------
+cat >/tmp/route53.json <<EOF
+{
+  "Comment": "Auto update Kasm DNS",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "$DOMAIN",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          { "Value": "$PUBLIC_IP" }
+        ]
+      }
+    }
+  ]
+}
+EOF
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id "$HOSTED_ZONE_ID" \
+  --change-batch file:///tmp/route53.json
+
+echo "DNS updated: $DOMAIN -> $PUBLIC_IP"
+
+# ---------------- WAIT FOR DNS ----------------
+echo "Waiting for DNS propagation..."
+for i in {1..30}; do
+  if dig +short "$DOMAIN" | grep -q "$PUBLIC_IP"; then
+    echo "DNS propagated successfully"
+    break
+  fi
+  sleep 10
+done
+
+# ---------------- SSL ----------------
+echo "Stopping Kasm proxy for Certbot..."
+docker stop kasm_proxy || true
+
+certbot certonly --standalone \
+  -d "$DOMAIN" \
+  --agree-tos \
+  --email admin@$BASE_DOMAIN \
+  --non-interactive
+
+KASM_CERT_DIR="/opt/kasm/current/certs"
+CERTBOT_LIVE_DIR="/etc/letsencrypt/live/$DOMAIN"
+
+cp "$CERTBOT_LIVE_DIR/fullchain.pem" "$KASM_CERT_DIR/kasm_nginx.crt"
+cp "$CERTBOT_LIVE_DIR/privkey.pem" "$KASM_CERT_DIR/kasm_nginx.key"
+
+echo "Restarting Kasm proxy..."
+docker start kasm_proxy
+
+echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
+`).toString("base64")
+  : undefined;
+
 
     const command = new RunInstancesCommand({
       ImageId,
       InstanceType,
       MinCount,
       MaxCount,
-      KeyName: 'windows-keys', // your existing key
+      KeyName: 'windows-keys',
       SecurityGroupIds,
       SubnetId,
       BlockDeviceMappings: [
         {
           DeviceName: '/dev/sda1',
           Ebs: {
-            VolumeSize: 100, // ensure enough disk space for Kasm and Docker
+            VolumeSize: 100,
             VolumeType: 'gp3',
             DeleteOnTermination: true,
           },
@@ -137,10 +217,7 @@ echo "==== Kasm installation completed successfully ===="
     return NextResponse.json(
       {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to create EC2 instance',
+        error: error instanceof Error ? error.message : 'Failed to create EC2 instance',
       },
       { status: 500 }
     );
