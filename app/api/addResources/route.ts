@@ -1,9 +1,17 @@
-import { NextResponse } from 'next/server';
-import { EC2Client, RunInstancesCommand } from '@aws-sdk/client-ec2';
+import { NextResponse } from 'next/server'
+import crypto from 'crypto'
+import {
+  EC2Client,
+  RunInstancesCommand,
+} from '@aws-sdk/client-ec2'
+import {
+  SSMClient,
+  PutParameterCommand,
+} from '@aws-sdk/client-ssm'
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await req.json()
 
     const {
       pocName,
@@ -15,29 +23,73 @@ export async function POST(req: Request) {
       MinCount = 1,
       MaxCount = 1,
       aws_region = process.env.AWS_REGION || 'ap-south-1',
-    } = body;
+    } = body
 
-    const client = new EC2Client({ region: aws_region });
-    const HOSTED_ZONE_ID=process.env.ROUTE_53_HOSTED_ZONE_ID
-const kasmUserData = installKasm
-  ? Buffer.from(`#!/bin/bash
+    if (!pocName) {
+      return NextResponse.json(
+        { success: false, error: 'pocName is required' },
+        { status: 400 }
+      )
+    }
+
+    /* ================================
+       KASM CREDENTIALS (RANDOM)
+    ================================= */
+    const kasmUsername = `admin_${pocName}`
+
+    const kasmPassword = crypto
+      .randomBytes(16)
+      .toString('base64')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .slice(0, 20)
+
+    const ssm = new SSMClient({ region: aws_region })
+
+    await ssm.send(
+      new PutParameterCommand({
+        Name: `/kasm/${pocName}/username`,
+        Value: kasmUsername,
+        Type: 'SecureString',
+        Overwrite: true,
+      })
+    )
+
+    await ssm.send(
+      new PutParameterCommand({
+        Name: `/kasm/${pocName}/password`,
+        Value: kasmPassword,
+        Type: 'SecureString',
+        Overwrite: true,
+      })
+    )
+
+    /* ================================
+       USER DATA (KASM INSTALL)
+    ================================= */
+    const HOSTED_ZONE_ID = process.env.ROUTE_53_HOSTED_ZONE_ID
+
+    const kasmUserData = installKasm
+      ? Buffer.from(`#!/bin/bash
 LOG=/var/log/kasm-install.log
 exec > >(tee -a $LOG) 2>&1
 set -e
 
 echo "==== Kasm Full Auto Setup Started ===="
 
-# ---------------- CONFIG ----------------
+# -------- VARIABLES --------
+KASM_USER="${kasmUsername}"
+KASM_PASS="${kasmPassword}"
+
 SUBDOMAIN="ss09"
 BASE_DOMAIN="poc.saas.prezm.com"
 DOMAIN="$SUBDOMAIN.$BASE_DOMAIN"
 REGION="ap-south-1"
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID}"
 
-# ---------------- SYSTEM UPDATE ----------------
+# -------- SYSTEM UPDATE --------
 apt update -y && apt upgrade -y
 
-# ---------------- SWAP (8GB) ----------------
+# -------- SWAP (8GB) --------
 if ! swapon --show | grep -q '/swapfile'; then
   fallocate -l 8G /swapfile
   chmod 600 /swapfile
@@ -46,31 +98,34 @@ if ! swapon --show | grep -q '/swapfile'; then
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
-# ---------------- PACKAGES ----------------
+# -------- PACKAGES --------
 apt install -y curl unzip jq certbot awscli docker.io dnsutils
 
 systemctl enable docker
 systemctl start docker
 
-# ---------------- DOCKER COMPOSE ----------------
+# -------- DOCKER COMPOSE --------
 DOCKER_COMPOSE_VERSION=2.40.2
 curl -SL "https://github.com/docker/compose/releases/download/v$DOCKER_COMPOSE_VERSION/docker-compose-linux-x86_64" \
   -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
 ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 
-# ---------------- INSTALL KASM ----------------
+# -------- INSTALL KASM --------
 cd /tmp
 curl -O https://kasm-static-content.s3.amazonaws.com/kasm_release_1.18.1.tar.gz
 tar -xf kasm_release_1.18.1.tar.gz
 
 export KASM_EULA=accept
-bash kasm_release/install.sh --accept-eula --swap-size 8192
+bash kasm_release/install.sh \
+  --accept-eula \
+  --swap-size 8192 \
+  --admin-password "$KASM_PASS"
 
 echo "Waiting for Kasm containers..."
 sleep 60
 
-# ---------------- ELASTIC IP (REUSE SAFE) ----------------
+# -------- ELASTIC IP --------
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 
 ALLOC_ID=$(aws ec2 describe-addresses \
@@ -80,19 +135,8 @@ ALLOC_ID=$(aws ec2 describe-addresses \
   --output text)
 
 if [ "$ALLOC_ID" = "None" ] || [ -z "$ALLOC_ID" ]; then
-  echo "Allocating new Elastic IP..."
-  ALLOC_ID=$(aws ec2 allocate-address \
-    --domain vpc \
-    --region "$REGION" \
-    --query AllocationId \
-    --output text)
-
-  aws ec2 associate-address \
-    --instance-id "$INSTANCE_ID" \
-    --allocation-id "$ALLOC_ID" \
-    --region "$REGION"
-else
-  echo "Reusing existing Elastic IP"
+  ALLOC_ID=$(aws ec2 allocate-address --domain vpc --region "$REGION" --query AllocationId --output text)
+  aws ec2 associate-address --instance-id "$INSTANCE_ID" --allocation-id "$ALLOC_ID" --region "$REGION"
 fi
 
 PUBLIC_IP=$(aws ec2 describe-addresses \
@@ -101,9 +145,7 @@ PUBLIC_IP=$(aws ec2 describe-addresses \
   --query 'Addresses[0].PublicIp' \
   --output text)
 
-echo "Elastic IP = $PUBLIC_IP"
-
-# ---------------- ROUTE53 DNS ----------------
+# -------- ROUTE53 --------
 cat >/tmp/route53.json <<EOF
 {
   "Comment": "Auto update Kasm DNS",
@@ -114,9 +156,7 @@ cat >/tmp/route53.json <<EOF
         "Name": "$DOMAIN",
         "Type": "A",
         "TTL": 300,
-        "ResourceRecords": [
-          { "Value": "$PUBLIC_IP" }
-        ]
+        "ResourceRecords": [{ "Value": "$PUBLIC_IP" }]
       }
     }
   ]
@@ -127,20 +167,7 @@ aws route53 change-resource-record-sets \
   --hosted-zone-id "$HOSTED_ZONE_ID" \
   --change-batch file:///tmp/route53.json
 
-echo "DNS updated: $DOMAIN -> $PUBLIC_IP"
-
-# ---------------- WAIT FOR DNS ----------------
-echo "Waiting for DNS propagation..."
-for i in {1..30}; do
-  if dig +short "$DOMAIN" | grep -q "$PUBLIC_IP"; then
-    echo "DNS propagated successfully"
-    break
-  fi
-  sleep 10
-done
-
-# ---------------- SSL ----------------
-echo "Stopping Kasm proxy for Certbot..."
+# -------- SSL --------
 docker stop kasm_proxy || true
 
 certbot certonly --standalone \
@@ -155,13 +182,16 @@ CERTBOT_LIVE_DIR="/etc/letsencrypt/live/$DOMAIN"
 cp "$CERTBOT_LIVE_DIR/fullchain.pem" "$KASM_CERT_DIR/kasm_nginx.crt"
 cp "$CERTBOT_LIVE_DIR/privkey.pem" "$KASM_CERT_DIR/kasm_nginx.key"
 
-echo "Restarting Kasm proxy..."
 docker start kasm_proxy
 
 echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
-`).toString("base64")
-  : undefined;
+`).toString('base64')
+      : undefined
 
+    /* ================================
+       EC2 RUN INSTANCE
+    ================================= */
+    const client = new EC2Client({ region: aws_region })
 
     const command = new RunInstancesCommand({
       ImageId,
@@ -171,6 +201,8 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
       KeyName: 'windows-keys',
       SecurityGroupIds,
       SubnetId,
+      IamInstanceProfile: { Name: 'Api_tasks' },
+      UserData: kasmUserData,
       BlockDeviceMappings: [
         {
           DeviceName: '/dev/sda1',
@@ -181,22 +213,20 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
           },
         },
       ],
-      IamInstanceProfile: { Name: 'Api_tasks' },
-      UserData: kasmUserData,
       TagSpecifications: [
         {
           ResourceType: 'instance',
           Tags: [
             { Key: 'Name', Value: pocName },
-            { Key: 'Project', Value: pocName || 'Kasm POC' },
+            { Key: 'Project', Value: pocName },
             { Key: 'Owner', Value: 'Puneet Bunet' },
-            { Key: 'createdBy', Value: 'deepak@intersourcesinc.com' }
+            { Key: 'createdBy', Value: 'deepak@intersourcesinc.com' },
           ],
         },
       ],
-    });
+    })
 
-    const response = await client.send(command);
+    const response = await client.send(command)
 
     const instances =
       response.Instances?.map(i => ({
@@ -205,22 +235,25 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
         PublicIpAddress: i.PublicIpAddress,
         PrivateIpAddress: i.PrivateIpAddress,
         LaunchTime: i.LaunchTime,
-      })) || [];
+      })) || []
 
     return NextResponse.json({
       success: true,
       installingKasm: installKasm,
       instances,
       totalCount: instances.length,
-    });
+    })
   } catch (error) {
-    console.error('Error creating EC2 instance:', error);
+    console.error('Error creating EC2 instance:', error)
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to create EC2 instance',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to create EC2 instance',
       },
       { status: 500 }
-    );
+    )
   }
 }
