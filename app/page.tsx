@@ -48,6 +48,9 @@ export default function Home() {
             {loading ? 'Retrieving...' : 'Retrieve Resources'}
           </button>
 
+          <Link href="/pocList"
+            className="bg-purple-600 hover:bg-purple-700 transition px-5 py-2 rounded-xl font-medium text-center"          
+          >POC</Link>
 
           <Link
             href="/resources"

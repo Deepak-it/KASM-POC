@@ -190,6 +190,7 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
             { Key: 'Name', Value: pocName },
             { Key: 'Project', Value: pocName || 'Kasm POC' },
             { Key: 'Owner', Value: 'Puneet Bunet' },
+            { Key: 'createdBy', Value: 'deepak@intersourcesinc.com' }
           ],
         },
       ],

@@ -70,10 +70,10 @@ export default function ResourcesPage() {
                 <div className="space-y-5">
                     {/* Project Name */}
                     <div className="bg-slate-800/60 p-4 rounded-xl space-y-2">
-                        <label className="font-medium">Project Name *</label>
+                        <label className="font-medium">Client Name *</label>
                         <input
                             type="text"
-                            placeholder="Enter project name"
+                            placeholder="Enter client name"
                             value={projectName}
                             onChange={(e) => setProjectName(e.target.value)}
                             className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"
@@ -120,15 +120,31 @@ export default function ResourcesPage() {
                     </div>
 
                     {/* Region */}
-                    <div className="bg-slate-800/60 p-4 rounded-xl space-y-2">
+                    <div className="bg-slate-800/60 p-4 rounded-xl space-y-3">
                         <label className="font-medium">Region *</label>
-                        <input
-                            type="text"
-                            placeholder="ap-south-1"
-                            value={region}
-                            onChange={(e) => setRegion(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"
-                        />
+
+                        <div className="space-y-2">
+                            {[
+                            "ap-south-1",
+                            "us-east-2",
+                            "ap-southeast-1",
+                            ].map((value) => (
+                            <label
+                                key={value}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                <input
+                                type="radio"
+                                name="region"
+                                value={value}
+                                checked={region === value}
+                                onChange={(e) => setRegion(e.target.value)}
+                                className="accent-blue-500"
+                                />
+                                <span>{value}</span>
+                            </label>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
