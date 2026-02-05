@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.974.0",
+    "@aws-sdk/client-ssm": "^3.983.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.7",
@@ -18,6 +19,7 @@
     "@toolpad/core": "^0.16.0",
     "@vendia/serverless-express": "^4.12.6",
     "axios": "^1.13.2",
+    "crypto": "^1.0.1",
     "next": "^15.5.9",
     "next-auth": "^4.24.13",
     "react": "^18.3.1",

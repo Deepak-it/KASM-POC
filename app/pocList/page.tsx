@@ -14,21 +14,23 @@ const PocList = () => {
   const getTagValue = (tags = [], key) =>
     tags.find(t => t.Key === key)?.Value || ''
 
-  const mapStatus = (state) => {
-    switch (state) {
-      case 'running':
-        return 'Active'
-      case 'stopped':
-        return 'Stopped'
-      case 'pending':
+    const mapStatusFromCode = (code) => {
+    switch (code) {
+        case 0:
         return 'Pending'
-      case 'terminated':
-      case 'shutting-down':
+        case 16:
+        return 'Active'
+        case 64:
+        return 'Pending'
+        case 80:
+        return 'Stopped'
+        case 32:
+        case 48:
         return 'Removed'
-      default:
+        default:
         return 'Unknown'
     }
-  }
+    }
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -44,10 +46,6 @@ const PocList = () => {
         return 'default'
     }
   }
-
-  /* ---------- fetch ---------- */
-
-  useEffect(() => {
     const fetchPocs = async () => {
       setLoading(true)
       const res = await fetch('/api/fetchResources')
@@ -58,22 +56,67 @@ const PocList = () => {
         sno: index + 1,
         clientName: getTagValue(inst.Tags, 'Project') || '—',
         pocId: inst.InstanceId,
-        status: mapStatus(inst.State?.Name),
+        statusCode: inst.State?.Code,      // 👈 keep raw code
+        status: mapStatusFromCode(inst.State?.Code),
       }))
 
       setData(rows)
       setLoading(false)
     }
+  /* ---------- fetch ---------- */
+
+  useEffect(() => {
 
     fetchPocs()
   }, [])
 
+  const startStopInstance = async (instanceId, action) => {
+    try {
+        const res = await fetch('/api/toggleStopStartResource', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instanceId, action }),
+        })
+
+        const data = await res.json()
+
+        if (res.ok && data.success) {
+        // refresh list after successful start/stop
+            fetchPocs()
+        } else {
+            console.error('Action failed:', data.message)
+        }
+    } catch (err) {
+        console.error('API error:', err)
+    }
+  }
+
   /* ---------- actions ---------- */
 
   const onView = (row) => console.log('View', row)
-  const onStart = (row) => console.log('Start', row.pocId)
-  const onStop = (row) => console.log('Stop', row.pocId)
-  const onTerminate = (row) => console.log('Terminate', row.pocId)
+
+  const onStart = (row) => startStopInstance(row.pocId, 'start')
+
+  const onStop = (row) => startStopInstance(row.pocId, 'stop')
+
+  const getStatusColorFromCode = (code) => {
+    switch (code) {
+        case 16: // running
+        return 'success'
+        case 80: // stopped
+        return 'warning'
+        case 0:  // pending
+        case 64: // stopping
+        return 'info'
+        case 32: // shutting-down
+        case 48: // terminated
+        return 'default'
+        default:
+        return 'default'
+    }
+  }
+
+  const onTerminate = (row) => startStopInstance(row.pocId, 'terminate')
 
   /* ---------- columns ---------- */
 
@@ -83,72 +126,90 @@ const PocList = () => {
     { field: 'pocId', headerName: 'POC ID', flex: 1.5 },
 
     {
-      field: 'status',
-      headerName: 'Status',
-      width: 130,
-      renderCell: (params) => (
-        <Chip
-          label={params.value}
-          color={getStatusColor(params.value)}
-          size="small"
-        />
-      ),
+        field: 'status',
+        headerName: 'Status',
+        width: 140,
+        renderCell: ({ row }) => (
+            <Chip
+            label={row.status}
+            color={getStatusColorFromCode(row.statusCode)}
+            size="small"
+            />
+        ),
     },
 
-    {
-      field: 'action',
-      headerName: 'Action',
-      width: 220,
-      sortable: false,
-      renderCell: ({ row }) => (
-        <>
+{
+  field: 'action',
+  headerName: 'Action',
+  width: 240,
+  sortable: false,
+  renderCell: ({ row }) => {
+    switch (row.statusCode) {
+      // 16 → running
+      case 16:
+        return (
           <Button
             size="small"
-            variant="contained"
-            sx={{ mr: 1 }}
-            onClick={() => onView(row)}
+            color="warning"
+            onClick={() => onStop(row)}
           >
-            View
+            Stop
           </Button>
+        )
 
-          {row.status === 'Active' && (
+      // 80 → stopped
+      case 80:
+        return (
+          <>
             <Button
               size="small"
-              color="warning"
-              onClick={() => onStop(row)}
+              color="success"
+              sx={{ mr: 1 }}
+              onClick={() => onStart(row)}
             >
-              Stop
+              Start
             </Button>
-          )}
 
-          {row.status === 'Stopped' && (
-            <>
-              <Button
-                size="small"
-                color="success"
-                sx={{ mr: 1 }}
-                onClick={() => onStart(row)}
-              >
-                Start
-              </Button>
-              <Button
-                size="small"
-                color="error"
-                onClick={() => onTerminate(row)}
-              >
-                Terminate
-              </Button>
-            </>
-          )}
+            <Button
+              size="small"
+              color="error"
+              onClick={() => onTerminate(row)}
+            >
+              Terminate
+            </Button>
+          </>
+        )
 
-          {(row.status === 'Removed' || row.status === 'Pending') && (
-            <span style={{ color: '#aaa', marginLeft: 8 }}>
-              No Action
-            </span>
-          )}
-        </>
-      ),
-    },
+      // transitional states
+      // 0 → pending, 64 → stopping, 32 → shutting-down
+      case 0:
+      case 64:
+      case 32:
+        return (
+          <span style={{ color: '#1976d2' }}>
+            In Progress…
+          </span>
+        )
+
+      // 48 → terminated
+      case 48:
+        return (
+          <span style={{ color: '#aaa' }}>
+            No Action
+          </span>
+        )
+
+      // fallback safety
+      default:
+        return (
+          <span style={{ color: '#aaa' }}>
+            —
+          </span>
+        )
+    }
+  },
+}
+
   ]
 
   return (
