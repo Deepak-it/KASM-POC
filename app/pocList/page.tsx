@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-
-const LOGGED_IN_EMAIL = 'deepak@intersourcesinc.com' // replace later from session
+import { DataGrid } from '@mui/x-data-grid'
+import { Button, Chip } from '@mui/material'
+import Link from 'next/link'
 
 const PocList = () => {
   const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  /* ---------------- helpers ---------------- */
+  /* ---------- helpers ---------- */
 
   const getTagValue = (tags = [], key) =>
     tags.find(t => t.Key === key)?.Value || ''
@@ -28,157 +30,146 @@ const PocList = () => {
     }
   }
 
-  const getStatusBadge = (status) => {
+  const getStatusColor = (status) => {
     switch (status) {
       case 'Active':
-        return 'bg-success'
+        return 'success'
       case 'Stopped':
-        return 'bg-warning text-dark'
+        return 'warning'
       case 'Pending':
-        return 'bg-info'
+        return 'info'
       case 'Removed':
-        return 'bg-secondary'
+        return 'default'
       default:
-        return 'bg-light text-dark'
+        return 'default'
     }
   }
 
-  /* ---------------- API fetch ---------------- */
+  /* ---------- fetch ---------- */
 
   useEffect(() => {
     const fetchPocs = async () => {
+      setLoading(true)
       const res = await fetch('/api/fetchResources')
       const json = await res.json()
 
-      if (!json.success) return
-
-      const rows = json.instances
-        // 1️⃣ createdBy filter
-        .filter(
-          inst =>
-            getTagValue(inst.Tags, 'createdBy') === LOGGED_IN_EMAIL
-        )
-        // 2️⃣ normalize data
-        .map((inst) => ({
-          clientName: getTagValue(inst.Tags, 'Project') || '—',
-          pocId: inst.InstanceId,
-          status: mapStatus(inst.State?.Name),
-        }))
+      const rows = json.instances.map((inst, index) => ({
+        id: inst.InstanceId,               // REQUIRED by DataGrid
+        sno: index + 1,
+        clientName: getTagValue(inst.Tags, 'Project') || '—',
+        pocId: inst.InstanceId,
+        status: mapStatus(inst.State?.Name),
+      }))
 
       setData(rows)
+      setLoading(false)
     }
 
     fetchPocs()
   }, [])
 
-  /* ---------------- actions ---------------- */
+  /* ---------- actions ---------- */
 
-  const onView = (item) => {
-    console.log('View', item)
-  }
+  const onView = (row) => console.log('View', row)
+  const onStart = (row) => console.log('Start', row.pocId)
+  const onStop = (row) => console.log('Stop', row.pocId)
+  const onTerminate = (row) => console.log('Terminate', row.pocId)
 
-  const onStart = (item) => {
-    console.log('Start', item.pocId)
-  }
+  /* ---------- columns ---------- */
 
-  const onStop = (item) => {
-    console.log('Stop', item.pocId)
-  }
+  const columns = [
+    { field: 'sno', headerName: 'S.No.', width: 80 },
+    { field: 'clientName', headerName: 'Client Name', flex: 1 },
+    { field: 'pocId', headerName: 'POC ID', flex: 1.5 },
 
-  const onTerminate = (item) => {
-    console.log('Terminate', item.pocId)
-  }
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: (params) => (
+        <Chip
+          label={params.value}
+          color={getStatusColor(params.value)}
+          size="small"
+        />
+      ),
+    },
 
-  const renderActions = (item) => {
-    switch (item.status) {
-      case 'Active':
-        return (
-          <button
-            className="btn btn-sm btn-warning"
-            onClick={() => onStop(item)}
+    {
+      field: 'action',
+      headerName: 'Action',
+      width: 220,
+      sortable: false,
+      renderCell: ({ row }) => (
+        <>
+          <Button
+            size="small"
+            variant="contained"
+            sx={{ mr: 1 }}
+            onClick={() => onView(row)}
           >
-            Stop
-          </button>
-        )
+            View
+          </Button>
 
-      case 'Stopped':
-        return (
-          <>
-            <button
-              className="btn btn-sm btn-success me-2"
-              onClick={() => onStart(item)}
+          {row.status === 'Active' && (
+            <Button
+              size="small"
+              color="warning"
+              onClick={() => onStop(row)}
             >
-              Start
-            </button>
-            <button
-              className="btn btn-sm btn-danger"
-              onClick={() => onTerminate(item)}
-            >
-              Terminate
-            </button>
-          </>
-        )
+              Stop
+            </Button>
+          )}
 
-      case 'Removed':
-        return <span className="text-muted">No Action</span>
+          {row.status === 'Stopped' && (
+            <>
+              <Button
+                size="small"
+                color="success"
+                sx={{ mr: 1 }}
+                onClick={() => onStart(row)}
+              >
+                Start
+              </Button>
+              <Button
+                size="small"
+                color="error"
+                onClick={() => onTerminate(row)}
+              >
+                Terminate
+              </Button>
+            </>
+          )}
 
-      case 'Pending':
-        return <span className="text-muted">Initializing…</span>
-
-      default:
-        return null
-    }
-  }
-
-  /* ---------------- UI ---------------- */
+          {(row.status === 'Removed' || row.status === 'Pending') && (
+            <span style={{ color: '#aaa', marginLeft: 8 }}>
+              No Action
+            </span>
+          )}
+        </>
+      ),
+    },
+  ]
 
   return (
-    <div className="table-responsive">
-      <table className="table table-bordered table-hover align-middle">
-        <thead className="table-light">
-          <tr>
-            <th style={{ width: '60px' }}>S.No.</th>
-            <th>Client Name</th>
-            <th>POC ID</th>
-            <th>Status</th>
-            <th style={{ width: '180px' }}>Action</th>
-          </tr>
-        </thead>
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center p-6">
+      <div className="w-full max-w-5xl bg-slate-900/60 backdrop-blur rounded-2xl shadow-xl p-6">
+        <Link href="/" className="text-slate-400 hover:text-white text-sm">
+            ← Back to Home
+        </Link>
+        <h1 className="text-3xl font-bold mb-4 text-center">POC</h1>
 
-        <tbody>
-          {data.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="text-center">
-                No records found
-              </td>
-            </tr>
-          ) : (
-            data.map((item, index) => (
-              <tr key={item.pocId}>
-                <td>{index + 1}</td>
-                <td>{item.clientName}</td>
-                <td>{item.pocId}</td>
-                <td>
-                  <span className={`badge ${getStatusBadge(item.status)}`}>
-                    {item.status}
-                  </span>
-                </td>
-                <td>
-                  <button
-                    className="btn btn-sm btn-primary me-2"
-                    onClick={() => onView(item)}
-                  >
-                    View
-                  </button>
-
-                  {renderActions(item)}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+        <div style={{ height: 420, width: '100%' }}>
+          <DataGrid
+            rows={data}
+            columns={columns}
+            loading={loading}
+            pageSizeOptions={[5, 10]}
+            disableRowSelectionOnClick
+          />
+        </div>
+      </div>
+    </main>
   )
 }
 

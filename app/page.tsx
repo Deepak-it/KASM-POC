@@ -11,23 +11,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-
-  async function handleRetrieveResources() {
-    setLoading(true)
-    setError(null)
-    try {
-      const response = await axios.get('/api/fetchResources')
-      setResources(response.data)
-    } catch (err: any) {
-      const errorMessage = err?.message || 'Failed to fetch resources'
-      setError(errorMessage)
-      console.error('Error fetching resources:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center p-6">
       <div className="w-full max-w-2xl bg-slate-900/60 backdrop-blur rounded-2xl shadow-xl p-8 space-y-6">
@@ -40,13 +23,6 @@ export default function Home() {
 
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            onClick={handleRetrieveResources}
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 transition px-5 py-2 rounded-xl font-medium disabled:opacity-50"
-          >
-            {loading ? 'Retrieving...' : 'Retrieve Resources'}
-          </button>
 
           <Link href="/pocList"
             className="bg-purple-600 hover:bg-purple-700 transition px-5 py-2 rounded-xl font-medium text-center"          
