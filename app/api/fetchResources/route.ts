@@ -22,7 +22,7 @@ export async function GET() {
   const command = new DescribeInstancesCommand({
     Filters: [
       {
-        Name: "tag:createdBy",
+        Name: "tag:CreatedBy",
         Values: [email],
       },
     ],

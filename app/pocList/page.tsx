@@ -54,9 +54,11 @@ const PocList = () => {
       const rows = json.instances.map((inst, index) => ({
         id: inst.InstanceId,               // REQUIRED by DataGrid
         sno: index + 1,
-        clientName: getTagValue(inst.Tags, 'Project') || '—',
-        pocId: inst.InstanceId,
-        statusCode: inst.State?.Code,      // 👈 keep raw code
+        clientName: getTagValue(inst.Tags, 'ClientName') || '—',
+        pocId: getTagValue(inst.Tags, 'pocId'),
+        instanceId: inst.InstanceId,
+
+        statusCode: inst.State?.Code,     
         status: mapStatusFromCode(inst.State?.Code),
       }))
 
@@ -124,6 +126,7 @@ const PocList = () => {
     { field: 'sno', headerName: 'S.No.', width: 80 },
     { field: 'clientName', headerName: 'Client Name', flex: 1 },
     { field: 'pocId', headerName: 'POC ID', flex: 1.5 },
+    { field: 'instanceId', headerName: 'EC2 ID', flex: 1.5 },
 
     {
         field: 'status',
