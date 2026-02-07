@@ -21,7 +21,7 @@ import {
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import RemoveIcon from '@mui/icons-material/Remove'
-import { useRouter } from 'next/router'
+import { useRouter } from 'next/navigation'
 
 export default function ResourcesPage() {
     const [projectName, setProjectName] = useState('')
@@ -32,7 +32,7 @@ export default function ResourcesPage() {
     const [error, setError] = useState<string | null>(null)
     const [response, setResponse] = useState<any>(null)
 
-    const router = useRouter()
+    const router = useRouter();
 
     const handleSubmit = async () => {
         setLoading(true)
