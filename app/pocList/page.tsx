@@ -59,7 +59,8 @@ const PocList = () => {
         instanceId: inst.InstanceId,
         statusCode: inst.State?.Code,     
         status: mapStatusFromCode(inst.State?.Code),
-        url: `https://${getTagValue(inst.Tags, 'pocId')}.poc.saas.prezm.com`
+        url: `https://${getTagValue(inst.Tags, 'pocId')}.poc.saas.prezm.com`,
+        kasmStatus: getTagValue(inst.Tags, 'KasmSetupStatus') || 'PENDING',
       }))
 
       setData(rows)
@@ -68,9 +69,12 @@ const PocList = () => {
   /* ---------- fetch ---------- */
 
   useEffect(() => {
-
-    fetchPocs()
-  }, [])
+    fetchPocs(); 
+    const interval = setInterval(() => {
+      fetchPocs();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const startStopInstance = async (instanceId, pocId, action) => {
     try {
@@ -130,7 +134,28 @@ const PocList = () => {
       field: 'url',
       headerName: 'URL',
       flex: 1.5,
+      renderCell: ({ row }) => {
+        const status = row.kasmStatus
+        console.log(status, '1234')
+        return (
+          <div>
+            <div>{row.url}</div>
+            <Chip
+              label={status}
+              size="small"
+              color={
+                status.toLowerCase() === 'active'
+                  ? 'success'
+                  : status.toLowerCase() === 'failed'
+                  ? 'error'
+                  : 'info'
+              }
+            />
+          </div>
+        )
+      },
     },
+    { field: 'kasmStatus', headerName: 'Poc Status', flex: 1.5 },
 
     { field: 'instanceId', headerName: 'EC2 ID', flex: 1.5 },
 
@@ -236,6 +261,7 @@ const PocList = () => {
             loading={loading}
             pageSizeOptions={[5, 10]}
             disableRowSelectionOnClick
+            getRowHeight={() => 'auto'}   // 👈 THIS
           />
         </div>
       </div>

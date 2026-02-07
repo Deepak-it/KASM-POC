@@ -127,7 +127,25 @@ DOMAIN="$SUBDOMAIN.$BASE_DOMAIN"
 REGION="ap-south-1"
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID}"
 
-apt update -y && apt upgrade -y
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
+apt update -y
+
+# >>> ONLY LINE ADDED (fix aws not found)
+apt install -y awscli
+# <<< ONLY LINE ADDED
+
+set_status () {
+  aws ec2 create-tags \
+    --resources "$INSTANCE_ID" \
+    --region "$REGION" \
+    --tags Key=KasmSetupStatus,Value="$1"
+}
+
+set_status "PENDING"
+trap 'set_status "FAILED"' ERR
+
+apt upgrade -y
 
 if ! swapon --show | grep -q '/swapfile'; then
   fallocate -l 8G /swapfile
@@ -147,7 +165,6 @@ curl -SL "https://github.com/docker/compose/releases/download/v$DOCKER_COMPOSE_V
 chmod +x /usr/local/bin/docker-compose
 ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 
-# -------- INSTALL KASM --------
 cd /tmp
 curl -O https://kasm-static-content.s3.amazonaws.com/kasm_release_1.18.1.tar.gz
 tar -xf kasm_release_1.18.1.tar.gz
@@ -155,12 +172,9 @@ tar -xf kasm_release_1.18.1.tar.gz
 export KASM_EULA=accept
 bash kasm_release/install.sh --accept-eula --swap-size 8192 --admin-password "$KASM_PASS"
 
-sleep 60
-
-# =====================================================
-# ELASTIC IP (FIXED – TAGGING WORKS, NOTHING REMOVED)
-# =====================================================
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+until systemctl is-active --quiet kasm; do
+  sleep 5
+done
 
 ALLOC_ID=$(aws ec2 describe-addresses \
   --filters Name=instance-id,Values="$INSTANCE_ID" \
@@ -198,7 +212,6 @@ PUBLIC_IP=$(aws ec2 describe-addresses \
   --query 'Addresses[0].PublicIp' \
   --output text)
 
-# -------- ROUTE53 --------
 cat >/tmp/route53.json <<EOF
 {
   "Comment": "Auto update Kasm DNS",
@@ -220,7 +233,6 @@ aws route53 change-resource-record-sets \
   --hosted-zone-id "$HOSTED_ZONE_ID" \
   --change-batch file:///tmp/route53.json
 
-# -------- WAIT FOR DNS --------
 for i in {1..30}; do
   if dig +short "$DOMAIN" | grep -q "$PUBLIC_IP"; then
     break
@@ -228,7 +240,6 @@ for i in {1..30}; do
   sleep 10
 done
 
-# -------- SSL --------
 docker stop kasm_proxy || true
 
 certbot certonly --standalone \
@@ -244,6 +255,8 @@ cp "$CERTBOT_LIVE_DIR/fullchain.pem" "$KASM_CERT_DIR/kasm_nginx.crt"
 cp "$CERTBOT_LIVE_DIR/privkey.pem" "$KASM_CERT_DIR/kasm_nginx.key"
 
 docker start kasm_proxy
+
+set_status "ACTIVE"
 
 echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
 `).toString('base64')
@@ -291,9 +304,6 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
 
     const response = await ec2.send(command)
 
-    /* ================================
-       UPDATE COUNTER
-    ================================= */
     await ssm.send(
       new PutParameterCommand({
         Name: COUNTER_PARAM,
@@ -318,7 +328,7 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
       clientName,
       createdBy: createdByUserId,
       createdDate,
-      instances,
+      instances: instances,
     })
   } catch (error) {
     console.error('Error creating EC2 instance:', error)
