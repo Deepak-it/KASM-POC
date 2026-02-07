@@ -17,15 +17,17 @@ export async function POST(req: Request) {
     const body = await req.json()
     const session: any = await getServerSession(authOptions as any)
 
-    if (!session || !session.user) {
+    if (!session || !session.user?.email) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
       )
     }
-    const createdByUserId = session?.user?.email
+
+    const createdByUserId = session.user.email
+
     const {
-      pocName,
+      clientName,
       installKasm = true,
       ImageId = process.env.EC2_IMAGE_ID,
       InstanceType = process.env.EC2_INSTANCE_TYPE || 't3.large',
@@ -36,11 +38,11 @@ export async function POST(req: Request) {
       aws_region = process.env.AWS_REGION || 'ap-south-1',
     } = body
 
-    if (!pocName || !createdByUserId) {
+    if (!clientName) {
       return NextResponse.json(
         {
           success: false,
-          error: 'pocName and createdByUserId are required',
+          error: 'clientName is required'
         },
         { status: 400 }
       )
@@ -67,7 +69,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const pocId = `kasmPoc${nextCounter}`
+    const pocId = `kasmpoc${nextCounter}`
     const createdDate = new Date().toISOString()
 
     /* ================================
@@ -114,6 +116,11 @@ echo "==== Kasm Full Auto Setup Started ===="
 KASM_USER="${kasmUsername}"
 KASM_PASS="${kasmPassword}"
 
+POC_ID="${pocId}"
+CLIENT_NAME="${clientName}"
+CREATED_BY="${createdByUserId}"
+CREATED_DATE="${createdDate}"
+
 SUBDOMAIN="${pocId}"
 BASE_DOMAIN="poc.saas.prezm.com"
 DOMAIN="$SUBDOMAIN.$BASE_DOMAIN"
@@ -140,6 +147,7 @@ curl -SL "https://github.com/docker/compose/releases/download/v$DOCKER_COMPOSE_V
 chmod +x /usr/local/bin/docker-compose
 ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 
+# -------- INSTALL KASM --------
 cd /tmp
 curl -O https://kasm-static-content.s3.amazonaws.com/kasm_release_1.18.1.tar.gz
 tar -xf kasm_release_1.18.1.tar.gz
@@ -149,6 +157,9 @@ bash kasm_release/install.sh --accept-eula --swap-size 8192 --admin-password "$K
 
 sleep 60
 
+# =====================================================
+# ELASTIC IP (FIXED – TAGGING WORKS, NOTHING REMOVED)
+# =====================================================
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 
 ALLOC_ID=$(aws ec2 describe-addresses \
@@ -158,8 +169,27 @@ ALLOC_ID=$(aws ec2 describe-addresses \
   --output text)
 
 if [ "$ALLOC_ID" = "None" ] || [ -z "$ALLOC_ID" ]; then
-  ALLOC_ID=$(aws ec2 allocate-address --domain vpc --region "$REGION" --query AllocationId --output text)
-  aws ec2 associate-address --instance-id "$INSTANCE_ID" --allocation-id "$ALLOC_ID" --region "$REGION"
+  ALLOC_ID=$(aws ec2 allocate-address \
+    --domain vpc \
+    --region "$REGION" \
+    --query AllocationId \
+    --output text)
+
+  aws ec2 associate-address \
+    --instance-id "$INSTANCE_ID" \
+    --allocation-id "$ALLOC_ID" \
+    --region "$REGION"
+
+  aws ec2 create-tags \
+    --resources "$ALLOC_ID" \
+    --region "$REGION" \
+    --tags \
+      Key=Name,Value="$POC_ID" \
+      Key=pocId,Value="$POC_ID" \
+      Key=Owner,Value="Puneet Bunet" \
+      Key=ClientName,Value="$CLIENT_NAME" \
+      Key=CreatedBy,Value="$CREATED_BY" \
+      Key=CreatedDate,Value="$CREATED_DATE"
 fi
 
 PUBLIC_IP=$(aws ec2 describe-addresses \
@@ -168,6 +198,7 @@ PUBLIC_IP=$(aws ec2 describe-addresses \
   --query 'Addresses[0].PublicIp' \
   --output text)
 
+# -------- ROUTE53 --------
 cat >/tmp/route53.json <<EOF
 {
   "Comment": "Auto update Kasm DNS",
@@ -189,6 +220,15 @@ aws route53 change-resource-record-sets \
   --hosted-zone-id "$HOSTED_ZONE_ID" \
   --change-batch file:///tmp/route53.json
 
+# -------- WAIT FOR DNS --------
+for i in {1..30}; do
+  if dig +short "$DOMAIN" | grep -q "$PUBLIC_IP"; then
+    break
+  fi
+  sleep 10
+done
+
+# -------- SSL --------
 docker stop kasm_proxy || true
 
 certbot certonly --standalone \
@@ -241,7 +281,7 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
             { Key: 'Name', Value: pocId },
             { Key: 'pocId', Value: pocId },
             { Key: 'Owner', Value: 'Puneet Bunet' },
-            { Key: 'ClientName', Value: pocName },
+            { Key: 'ClientName', Value: clientName },
             { Key: 'CreatedBy', Value: createdByUserId },
             { Key: 'CreatedDate', Value: createdDate },
           ],
@@ -252,7 +292,7 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
     const response = await ec2.send(command)
 
     /* ================================
-       UPDATE COUNTER (SUCCESS ONLY)
+       UPDATE COUNTER
     ================================= */
     await ssm.send(
       new PutParameterCommand({
@@ -275,7 +315,7 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
     return NextResponse.json({
       success: true,
       pocId,
-      pocName,
+      clientName,
       createdBy: createdByUserId,
       createdDate,
       instances,

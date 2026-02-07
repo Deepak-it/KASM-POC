@@ -41,7 +41,7 @@ export default function ResourcesPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ pocName: projectName, aws_region: region }),
+                body: JSON.stringify({ clientName: projectName, aws_region: region }),
             })
 
             const data = await res.json()
@@ -50,6 +50,7 @@ export default function ResourcesPage() {
                 setError(data.error || 'Failed to create EC2 instance')
             } else {
                 setResponse(data)
+                
             }
         } catch (err: any) {
             console.error(err)

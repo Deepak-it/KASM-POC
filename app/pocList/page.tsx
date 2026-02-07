@@ -57,9 +57,9 @@ const PocList = () => {
         clientName: getTagValue(inst.Tags, 'ClientName') || '—',
         pocId: getTagValue(inst.Tags, 'pocId'),
         instanceId: inst.InstanceId,
-
         statusCode: inst.State?.Code,     
         status: mapStatusFromCode(inst.State?.Code),
+        url: `https://${getTagValue(inst.Tags, 'pocId')}.poc.saas.prezm.com`
       }))
 
       setData(rows)
@@ -72,12 +72,12 @@ const PocList = () => {
     fetchPocs()
   }, [])
 
-  const startStopInstance = async (instanceId, action) => {
+  const startStopInstance = async (instanceId, pocId, action) => {
     try {
         const res = await fetch('/api/toggleStopStartResource', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instanceId, action }),
+        body: JSON.stringify({ instanceId, action, pocId }),
         })
 
         const data = await res.json()
@@ -97,9 +97,9 @@ const PocList = () => {
 
   const onView = (row) => console.log('View', row)
 
-  const onStart = (row) => startStopInstance(row.pocId, 'start')
+  const onStart = (row) => startStopInstance(row.instanceId, '', 'start')
 
-  const onStop = (row) => startStopInstance(row.pocId, 'stop')
+  const onStop = (row) => startStopInstance(row.instanceId, '', 'stop')
 
   const getStatusColorFromCode = (code) => {
     switch (code) {
@@ -118,7 +118,7 @@ const PocList = () => {
     }
   }
 
-  const onTerminate = (row) => startStopInstance(row.pocId, 'terminate')
+  const onTerminate = (row) => startStopInstance(row.instanceId, row.pocId, 'terminate')
 
   /* ---------- columns ---------- */
 
@@ -126,6 +126,12 @@ const PocList = () => {
     { field: 'sno', headerName: 'S.No.', width: 80 },
     { field: 'clientName', headerName: 'Client Name', flex: 1 },
     { field: 'pocId', headerName: 'POC ID', flex: 1.5 },
+    {
+      field: 'url',
+      headerName: 'URL',
+      flex: 1.5,
+    },
+
     { field: 'instanceId', headerName: 'EC2 ID', flex: 1.5 },
 
     {

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.974.0",
+    "@aws-sdk/client-route-53": "^3.984.0",
     "@aws-sdk/client-ssm": "^3.983.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
