@@ -99,7 +99,7 @@ const PocList = () => {
 
   const onStart = (row) => startStopInstance(row.instanceId, '', 'start')
 
-  const onStop = (row) => startStopInstance(row.instanceId, '', 'stop')
+  const onStop = (row) => startStopInstance(row.instanceId, '', 'stop') 
 
   const getStatusColorFromCode = (code) => {
     switch (code) {
