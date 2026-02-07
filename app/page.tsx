@@ -133,8 +133,8 @@ export default function Home() {
         const status = row.kasmStatus
         console.log(status, '1234')
         return (
-          <div style={{display: 'flex'}}>
-            <div style={{marginRight: '10px'}}>{row.url}</div>
+          <div style={{ display: 'flex' }}>
+            <div style={{ marginRight: '10px' }}>{row.url}</div>
             <Chip
               label={status}
               size="small"
@@ -242,12 +242,12 @@ export default function Home() {
 
   return (
     <>
-            <div style={{display: 'flex', justifyContent: 'space-between'}} className="text-center space-y-2">
-          <div style={{justifyContent: 'space-around'}}><h1 className="text-3xl font-bold">Dashboard</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }} className="text-center space-y-2">
+        <div style={{ justifyContent: 'space-around' }}><h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-slate-400">
             Welcome, {session?.user?.name || session?.user?.email || 'User'} 👋
           </p></div>
-          <div style={{display: 'flex', marginBottom: '10px', justifyContent: 'end'}}>
+        <div style={{ display: 'flex', marginBottom: '10px', alignItems: 'end' }}>
           <Button
             href="/resources"
             type='submit'
@@ -259,24 +259,24 @@ export default function Home() {
 
           <Button
             variant="outlined"
-            style={{marginLeft: '10px'}}
+            style={{ marginLeft: '10px' }}
             onClick={() => signOut({ callbackUrl: '/' })}
             className="ml-2 bg-red-600 hover:bg-red-700 transition px-5 py-2 rounded-xl font-medium"
           >
             Logout
           </Button>
-          </div>
         </div>
-    <Box sx={{ width: '100%' }}>
-          <DataGrid
-            rows={dataForGrid}
-            columns={columns}
-            loading={loading}
-            pageSizeOptions={[5, 10]}
-            disableRowSelectionOnClick
-            getRowHeight={() => 'auto'}   // 👈 THIS
-          />
-    </Box>
+      </div>
+      <Box sx={{ width: '100%' }}>
+        <DataGrid
+          rows={dataForGrid}
+          columns={columns}
+          loading={loading}
+          pageSizeOptions={[5, 10]}
+          disableRowSelectionOnClick
+          getRowHeight={() => 'auto'}   // 👈 THIS
+        />
+      </Box>
     </>
   )
 }

@@ -75,21 +75,11 @@ export async function POST(req: Request) {
     /* ================================
        KASM CREDENTIALS
     ================================= */
-    const kasmUsername = `admin_${pocId}`
     const kasmPassword = crypto
       .randomBytes(16)
       .toString('base64')
       .replace(/[^a-zA-Z0-9]/g, '')
       .slice(0, 20)
-
-    await ssm.send(
-      new PutParameterCommand({
-        Name: `/kasm/${pocId}/username`,
-        Value: kasmUsername,
-        Type: 'SecureString',
-        Overwrite: true,
-      })
-    )
 
     await ssm.send(
       new PutParameterCommand({
@@ -113,7 +103,6 @@ set -e
 
 echo "==== Kasm Full Auto Setup Started ===="
 
-KASM_USER="${kasmUsername}"
 KASM_PASS="${kasmPassword}"
 
 POC_ID="${pocId}"
@@ -124,7 +113,7 @@ CREATED_DATE="${createdDate}"
 SUBDOMAIN="${pocId}"
 BASE_DOMAIN="poc.saas.prezm.com"
 DOMAIN="$SUBDOMAIN.$BASE_DOMAIN"
-REGION="ap-south-1"
+REGION="${aws_region}"
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID}"
 
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
@@ -155,7 +144,7 @@ if ! swapon --show | grep -q '/swapfile'; then
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
-apt install -y curl unzip jq certbot awscli docker.io dnsutils
+apt install -y curl unzip jq certbot docker.io dnsutils
 systemctl enable docker
 systemctl start docker
 
