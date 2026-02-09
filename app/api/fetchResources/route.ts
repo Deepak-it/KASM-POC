@@ -16,7 +16,7 @@ export async function GET() {
   const email = session.user.email;
 
   const client = new EC2Client({
-    region: process.env.AWS_REGION || "ap-south-1",
+    region: process.env.AWS_REGION_ENV || "ap-south-1",
   });
 
   const command = new DescribeInstancesCommand({

@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       SubnetId,
       MinCount = 1,
       MaxCount = 1,
-      aws_region = process.env.AWS_REGION || 'ap-south-1',
+      aws_region = process.env.AWS_REGION_ENV || 'ap-south-1',
     } = body
 
     if (!clientName) {
@@ -112,7 +112,7 @@ CREATED_BY="${createdByUserId}"
 CREATED_DATE="${createdDate}"
 
 SUBDOMAIN="${pocId}"
-BASE_DOMAIN="poc.saas.prezm.com"
+BASE_DOMAIN=process.env.BASE_DOMAIN || 'poc.saas.prezm.com'
 DOMAIN="$SUBDOMAIN.$BASE_DOMAIN"
 REGION="${aws_region}"
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID}"
@@ -149,7 +149,7 @@ apt install -y curl unzip jq certbot docker.io dnsutils
 systemctl enable docker
 systemctl start docker
 
-DOCKER_COMPOSE_VERSION=2.40.2
+DOCKER_COMPOSE_VERSION=process.env.DOCKER_COMPOSE_VERSION || '2.24.2'
 curl -SL "https://github.com/docker/compose/releases/download/v$DOCKER_COMPOSE_VERSION/docker-compose-linux-x86_64" \
   -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
