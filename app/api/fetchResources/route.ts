@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "../../lib/auth";
 
 export async function GET() {
   const session: any = await getServerSession(authOptions as any);
