@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     const {
       clientName,
       installKasm = true,
-      ImageId = process.env.EC2_IMAGE_ID,
+      ImageId = process.env.EC2_IMAGE_ID_DEV,
       InstanceType = process.env.EC2_INSTANCE_TYPE || 't3.large',
       SecurityGroupIds,
       SubnetId,
@@ -261,10 +261,10 @@ echo "==== Kasm + DNS + SSL FULLY CONFIGURED ===="
       InstanceType,
       MinCount,
       MaxCount,
-      KeyName: 'windows-keys',
+      KeyName: process.env.AWS_WINDOWS_KEYS_DEV,
       SecurityGroupIds,
       SubnetId,
-      IamInstanceProfile: { Name: 'Api_tasks' },
+      IamInstanceProfile: { Name: 'pocTesting_Role' },
       UserData: kasmUserData,
       BlockDeviceMappings: [
         {

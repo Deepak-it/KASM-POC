@@ -243,7 +243,7 @@ export default function Home() {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between' }} className="text-center space-y-2">
-        <div style={{ justifyContent: 'space-around' }}><h1 className="text-3xl font-bold">Dashboard</h1>
+        <div style={{ justifyContent: 'space-around' }}><h1 className="text-3xl font-bold">Dashboard for us-east-2</h1>
           <p className="text-slate-400">
             Welcome, {session?.user?.name || session?.user?.email || 'User'} 👋
           </p></div>
