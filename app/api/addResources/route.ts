@@ -32,11 +32,11 @@ export async function POST(req: Request) {
       installKasm = true,
       ImageId = process.env.EC2_IMAGE_ID_DEV,
       InstanceType = process.env.EC2_INSTANCE_TYPE || 't3.large',
-      SecurityGroupIds,
-      SubnetId,
+      SecurityGroupIds = [process.env.SECUIRTY_GROUP_DEV],
+      SubnetId = process.env.SUBNET_ID_DEV,
       MinCount = 1,
       MaxCount = 1,
-      aws_region = process.env.AWS_REGION_ENV || 'ap-south-1',
+      aws_region = process.env.AWS_REGION_ENV,
     } = body
 
     if (!clientName) {

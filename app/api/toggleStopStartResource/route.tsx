@@ -13,7 +13,7 @@ import {
   ChangeResourceRecordSetsCommand,
 } from '@aws-sdk/client-route-53'
 
-const REGION = process.env.AWS_REGION_ENV || 'ap-south-1'
+const REGION = process.env.AWS_REGION_ENV
 const HOSTED_ZONE_ID = process.env.ROUTE_53_HOSTED_ZONE_ID!
 
 const ec2 = new EC2Client({ region: REGION })
