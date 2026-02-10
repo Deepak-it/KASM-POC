@@ -95,6 +95,8 @@ export async function POST(req: Request) {
        USER DATA (KASM INSTALL)
     ================================= */
     const HOSTED_ZONE_ID = process.env.ROUTE_53_HOSTED_ZONE_ID
+    const BASE_DOMAIN = process.env.BASE_DOMAIN || 'poc.saas.prezm.com'
+    const DOCKER_COMPOSE_VERSION = process.env.DOCKER_COMPOSE_VERSION || '2.40.2'
 
     const kasmUserData = installKasm
       ? Buffer.from(`#!/bin/bash
@@ -112,7 +114,7 @@ CREATED_BY="${createdByUserId}"
 CREATED_DATE="${createdDate}"
 
 SUBDOMAIN="${pocId}"
-BASE_DOMAIN=process.env.BASE_DOMAIN || 'poc.saas.prezm.com'
+BASE_DOMAIN="${BASE_DOMAIN}"
 DOMAIN="$SUBDOMAIN.$BASE_DOMAIN"
 REGION="${aws_region}"
 HOSTED_ZONE_ID="${HOSTED_ZONE_ID}"
@@ -149,7 +151,7 @@ apt install -y curl unzip jq certbot docker.io dnsutils
 systemctl enable docker
 systemctl start docker
 
-DOCKER_COMPOSE_VERSION=process.env.DOCKER_COMPOSE_VERSION || '2.24.2'
+DOCKER_COMPOSE_VERSION="${DOCKER_COMPOSE_VERSION}"
 curl -SL "https://github.com/docker/compose/releases/download/v$DOCKER_COMPOSE_VERSION/docker-compose-linux-x86_64" \
   -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
