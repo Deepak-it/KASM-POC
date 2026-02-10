@@ -4,13 +4,44 @@ import { useState, useEffect } from 'react'
 import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { DataGrid } from '@mui/x-data-grid'
-import { Box, Button, Chip } from '@mui/material'
+import { Box, Button, Chip, FormControl, InputLabel, MenuItem, Select } from '@mui/material'
+
+const REGIONS = [
+  { label: 'Singapore', value: 'ap-southeast-1' },
+  { label: 'US (Ohio)', value: 'us-east-2' },
+  { label: 'Bombay', value: 'ap-south-1' },
+]
 
 export default function Home() {
   const { data: session, status } = useSession()
   const [error, setError] = useState<string | null>(null)
   const [dataForGrid, setData] = useState([])
   const [loading, setLoading] = useState(false)
+  const [region, setRegion] = useState('us-east-2')
+
+  /* ---------- api ---------- */
+  const fetchPocs = async () => {
+    setLoading(true)
+
+    const res = await fetch(`/api/fetchResources?region=${region}`)
+    const json = await res.json()
+
+    const rows =
+      json?.instances?.map((inst: any, index: number) => ({
+        id: inst.InstanceId,
+        sno: index + 1,
+        clientName: getTagValue(inst.Tags, 'ClientName') || '—',
+        pocId: getTagValue(inst.Tags, 'pocId'),
+        instanceId: inst.InstanceId,
+        statusCode: inst.State?.Code,
+        status: mapStatusFromCode(inst.State?.Code),
+        url: `https://${getTagValue(inst.Tags, 'pocId')}.poc.saas.prezm.com`,
+        kasmStatus: getTagValue(inst.Tags, 'KasmSetupStatus') || 'PENDING',
+      })) || []
+
+    setData(rows)
+    setLoading(false)
+  }
 
   const mapStatusFromCode = (code) => {
     switch (code) {
@@ -33,34 +64,12 @@ export default function Home() {
   const getTagValue = (tags = [], key) =>
     tags.find(t => t.Key === key)?.Value || ''
 
-  const fetchPocs = async () => {
-    setLoading(true)
-    const res = await fetch('/api/fetchResources')
-    const json = await res.json()
-
-    const rows = json.instances.map((inst, index) => ({
-      id: inst.InstanceId,               // REQUIRED by DataGrid
-      sno: index + 1,
-      clientName: getTagValue(inst.Tags, 'ClientName') || '—',
-      pocId: getTagValue(inst.Tags, 'pocId'),
-      instanceId: inst.InstanceId,
-      statusCode: inst.State?.Code,
-      status: mapStatusFromCode(inst.State?.Code),
-      url: `https://${getTagValue(inst.Tags, 'pocId')}.poc.saas.prezm.com`,
-      kasmStatus: getTagValue(inst.Tags, 'KasmSetupStatus') || 'PENDING',
-    }))
-
-    setData(rows)
-    setLoading(false)
-  }
 
   useEffect(() => {
-    fetchPocs();
-    const interval = setInterval(() => {
-      fetchPocs();
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchPocs()
+    const interval = setInterval(fetchPocs, 15000)
+    return () => clearInterval(interval)
+  }, [region])
   /* ---------- helpers ---------- */
 
   if (status === 'loading') {
@@ -247,6 +256,22 @@ export default function Home() {
           <p className="text-slate-400">
             Welcome, {session?.user?.name || session?.user?.email || 'User'} 👋
           </p></div>
+        <div style={{ display: 'flex', marginBottom: '10px', alignItems: 'end' }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Region</InputLabel>
+            <Select
+              value={region}
+              label="Region"
+              onChange={(e) => setRegion(e.target.value)}
+            >
+              {REGIONS.map((r) => (
+                <MenuItem key={r.value} value={r.value}>
+                  {r.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </div>
         <div style={{ display: 'flex', marginBottom: '10px', alignItems: 'end' }}>
           <Button
             href="/resources"
