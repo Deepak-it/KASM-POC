@@ -180,6 +180,8 @@ export default function Home() {
         const password = row.kasmPassword || '-'
 
         return (
+          <>
+           <div>admin@kasm.local</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontFamily: 'monospace' }}>
               {isVisible ? password : '••••••••••'}
@@ -199,7 +201,8 @@ export default function Home() {
                 </IconButton>
               </Tooltip>
             )}
-          </div>
+            </div>
+          </>
         )
       },
     },
