@@ -5,6 +5,9 @@ import { signOut, useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { DataGrid } from '@mui/x-data-grid'
 import { Box, Button, Chip, FormControl, InputLabel, MenuItem, Select } from '@mui/material'
+import { IconButton, Tooltip } from '@mui/material'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 
 const REGIONS = [
   { label: 'Singapore', value: 'ap-southeast-1' },
@@ -18,6 +21,7 @@ export default function Home() {
   const [dataForGrid, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [region, setRegion] = useState('us-east-2')
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({})
 
   /* ---------- api ---------- */
   const fetchPocs = async () => {
@@ -37,6 +41,7 @@ export default function Home() {
         status: mapStatusFromCode(inst.State?.Code),
         url: `https://${getTagValue(inst.Tags, 'pocId')}.poc.saas.prezm.com`,
         kasmStatus: getTagValue(inst.Tags, 'KasmSetupStatus') || 'PENDING',
+        kasmPassword: inst.kasmPassword
       })) || []
 
     setData(rows)
@@ -80,6 +85,12 @@ export default function Home() {
     )
   }
 
+  const togglePassword = (id: string) => {
+    setVisiblePasswords(prev => ({
+      ...prev,
+      [id]: !prev[id],
+    }))
+  }
   const startStopInstance = async (instanceId, pocId, action) => {
     try {
       const res = await fetch('/api/toggleStopStartResource', {
@@ -155,6 +166,39 @@ export default function Home() {
                     : 'info'
               }
             />
+          </div>
+        )
+      },
+    },
+    {
+      field: 'kasmPassword',
+      headerName: 'Password',
+      flex: 1,
+      sortable: false,
+      renderCell: ({ row }) => {
+        const isVisible = visiblePasswords[row.InstanceId]
+        const password = row.kasmPassword || '-'
+
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: 'monospace' }}>
+              {isVisible ? password : '••••••••••'}
+            </span>
+
+            {password !== '-' && (
+              <Tooltip title={isVisible ? 'Hide Password' : 'Show Password'}>
+                <IconButton
+                  size="small"
+                  onClick={() => togglePassword(row.InstanceId)}
+                >
+                  {isVisible ? (
+                    <VisibilityOffIcon fontSize="small" />
+                  ) : (
+                    <VisibilityIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </Tooltip>
+            )}
           </div>
         )
       },
