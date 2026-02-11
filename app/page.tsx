@@ -316,7 +316,17 @@ export default function Home() {
             </Select>
           </FormControl>
         </div>
-        <div style={{ display: 'flex', marginBottom: '10px', alignItems: 'end' }}>
+        <div style={{ display: 'flex', marginBottom: '10px', alignItems: 'end', gap: '10px' }}>
+
+          <Button
+            href="/thisAppUsers"
+            type='submit'
+            variant="contained"
+            className="bg-purple-600 hover:bg-purple-700 transition px-5 py-2 rounded-xl font-medium text-center"
+          >
+            Creators
+          </Button>
+
           <Button
             href="/resources"
             type='submit'
@@ -328,9 +338,8 @@ export default function Home() {
 
           <Button
             variant="outlined"
-            style={{ marginLeft: '10px' }}
             onClick={() => signOut({ callbackUrl: '/' })}
-            className="ml-2 bg-red-600 hover:bg-red-700 transition px-5 py-2 rounded-xl font-medium"
+            className="bg-red-600 hover:bg-red-700 transition px-5 py-2 rounded-xl font-medium"
           >
             Logout
           </Button>
