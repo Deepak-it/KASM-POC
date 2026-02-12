@@ -16,13 +16,13 @@ const REGIONS = [
 ]
 
 export default function Home() {
-  const { data: session, status } = useSession()
+  const { data: session, status } = useSession() as any
   const [error, setError] = useState<string | null>(null)
   const [dataForGrid, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [region, setRegion] = useState('us-east-2')
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({})
-
+  console.log(session, 'session')
   /* ---------- api ---------- */
   const fetchPocs = async () => {
     setLoading(true)
@@ -172,11 +172,11 @@ export default function Home() {
     },
     {
       field: 'kasmPassword',
-      headerName: 'Password',
+      headerName: 'Credentials',
       flex: 1,
       sortable: false,
       renderCell: ({ row }) => {
-        const isVisible = visiblePasswords[row.InstanceId]
+        const isVisible = visiblePasswords[row.instanceId]
         const password = row.kasmPassword || '-'
 
         return (
@@ -191,7 +191,8 @@ export default function Home() {
               <Tooltip title={isVisible ? 'Hide Password' : 'Show Password'}>
                 <IconButton
                   size="small"
-                  onClick={() => togglePassword(row.InstanceId)}
+                  key={row.id}
+                  onClick={() => togglePassword(row.instanceId)}
                 >
                   {isVisible ? (
                     <VisibilityOffIcon fontSize="small" />
@@ -320,6 +321,7 @@ export default function Home() {
           </FormControl>
         </div>
         <div style={{ display: 'flex', marginBottom: '10px', alignItems: 'end', gap: '10px' }}>
+        {session.user.isAdmin && 
 
           <Button
             href="/thisAppUsers"
@@ -329,6 +331,7 @@ export default function Home() {
           >
             Creators
           </Button>
+         } 
 
           <Button
             href="/resources"

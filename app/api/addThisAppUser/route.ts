@@ -7,7 +7,7 @@ import {
 
 export async function POST(req: Request) {
   try {
-    const { email } = await req.json()
+    const { email, isAdmin } = await req.json()
 
     if (!email) {
       return NextResponse.json(
@@ -20,36 +20,59 @@ export async function POST(req: Request) {
       region: process.env.AWS_REGION_ENV,
     })
 
-    const PARAM_NAME = process.env.ALLOWED_CREATORS_PARAM
+    const PARAM_NAME = process.env.ALLOWED_CREATORS_PARAM!
 
-    let existingUsers: string[] = []
+    let existingUsers: any[] = []
 
     try {
       const param = await ssm.send(
         new GetParameterCommand({ Name: PARAM_NAME })
       )
 
-      existingUsers = JSON.parse(param.Parameter?.Value || '[]')
+      const parsed = JSON.parse(param.Parameter?.Value || '[]')
+
+      // 🔥 Backward compatibility (if old data was string[])
+      if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
+        existingUsers = parsed.map((email: string) => ({
+          email,
+          isAdmin: false,
+        }))
+      } else {
+        existingUsers = parsed
+      }
+
     } catch (err: any) {
       if (err.name !== 'ParameterNotFound') {
         throw err
       }
     }
 
-    if (existingUsers.includes(email)) {
+    // ✅ Check duplicate
+    const alreadyExists = existingUsers.some(
+      (user: any) => user.email === email
+    )
+
+    if (alreadyExists) {
       return NextResponse.json({
         success: true,
-        message: 'creator already exists',
+        message: 'User already exists',
+        users: existingUsers,
       })
     }
 
-    const updatedUsers = [...existingUsers, email]
+    const updatedUsers = [
+      ...existingUsers,
+      {
+        email,
+        isAdmin: Boolean(isAdmin),
+      },
+    ]
 
     await ssm.send(
       new PutParameterCommand({
         Name: PARAM_NAME,
         Value: JSON.stringify(updatedUsers),
-        Type: 'String', // can use SecureString if you prefer
+        Type: 'String',
         Overwrite: true,
       })
     )
@@ -58,6 +81,7 @@ export async function POST(req: Request) {
       success: true,
       users: updatedUsers,
     })
+
   } catch (error) {
     console.error(error)
 

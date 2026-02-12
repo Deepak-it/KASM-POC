@@ -22,26 +22,35 @@ export async function DELETE(req: Request) {
 
     const paramName = process.env.ALLOWED_CREATORS_PARAM!
 
-    const getCommand = new GetParameterCommand({
-      Name: paramName,
-      WithDecryption: true,
-    })
-
-    const response = await ssm.send(getCommand)
-    const currentUsers = JSON.parse(response.Parameter?.Value || '[]')
-
-    const updatedUsers = currentUsers.filter(
-      (u: string) => u !== email
+    const response = await ssm.send(
+      new GetParameterCommand({
+        Name: paramName,
+        WithDecryption: true,
+      })
     )
 
-    const putCommand = new PutParameterCommand({
-      Name: paramName,
-      Value: JSON.stringify(updatedUsers),
-      Type: 'String',
-      Overwrite: true,
-    })
+    let currentUsers = JSON.parse(response.Parameter?.Value || '[]')
 
-    await ssm.send(putCommand)
+    // 🔥 Handle old string[] data
+    if (Array.isArray(currentUsers) && typeof currentUsers[0] === 'string') {
+      currentUsers = currentUsers.map((email: string) => ({
+        email,
+        isAdmin: false,
+      }))
+    }
+
+    const updatedUsers = currentUsers.filter(
+      (u: any) => u.email !== email
+    )
+
+    await ssm.send(
+      new PutParameterCommand({
+        Name: paramName,
+        Value: JSON.stringify(updatedUsers),
+        Type: 'String',
+        Overwrite: true,
+      })
+    )
 
     return NextResponse.json({
       success: true,

@@ -20,16 +20,30 @@ export async function GET(req: Request) {
   const ec2 = new EC2Client({ region });
   const ssm = new SSMClient({ region });
 
-  const command = new DescribeInstancesCommand({
-    Filters: [
-      {
-        Name: "tag:CreatedBy",
-        Values: [email],
-      },
-    ],
-  });
+  const isAdmin = session.user.isAdmin;
+  let command;
 
-  const response = await ec2.send(command);
+  if (isAdmin) {
+    command = new DescribeInstancesCommand({
+      Filters: [
+        {
+          Name: "tag-key",
+          Values: ["pocId"], 
+        },
+      ],
+    });
+  } else {
+    command = new DescribeInstancesCommand({
+      Filters: [
+        {
+          Name: "tag:CreatedBy",
+          Values: [email],
+        },
+      ],
+    });
+  }
+
+  const response: any = await ec2.send(command);
 
   const instances =
     response.Reservations?.flatMap((r) => r.Instances ?? []) ?? [];

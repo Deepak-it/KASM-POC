@@ -7,6 +7,8 @@ import {
   Button,
   InputAdornment,
   Typography,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material'
 import { useRouter } from 'next/navigation'
 
@@ -14,12 +16,13 @@ const USERNAME_REGEX = /^[a-z0-9._]+$/
 
 export default function ADDThisAppUsers() {
   const [username, setUsername] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter();
 
   const handleChange = (value: string) => {
-    const formatted = value.toLowerCase().replace(/\s/g, '') // remove spaces
+    const formatted = value.toLowerCase().replace(/\s/g, '')
 
     if (formatted && !USERNAME_REGEX.test(formatted)) {
       setError('Only lowercase letters, numbers, dot and underscore allowed')
@@ -46,7 +49,10 @@ export default function ADDThisAppUsers() {
       const res = await fetch('/api/addThisAppUser', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: fullEmail }),
+        body: JSON.stringify({
+          email: fullEmail,
+          isAdmin, // ✅ SEND ADMIN FLAG
+        }),
       })
 
       const data = await res.json()
@@ -54,7 +60,8 @@ export default function ADDThisAppUsers() {
       if (res.ok) {
         alert('User added successfully')
         setUsername('')
-            router.push('/thisAppUsers')
+        setIsAdmin(false)
+        router.push('/thisAppUsers')
       } else {
         alert(data.error || 'Failed')
       }
@@ -89,16 +96,22 @@ export default function ADDThisAppUsers() {
           helperText={error}
           InputProps={{
             endAdornment: (
-              <InputAdornment position="end" sx={{ ml: 0 }}>
+              <InputAdornment position="end">
                 {process.env.NEXT_PUBLIC_EMAIL_DOMAIN}
               </InputAdornment>
             ),
-            sx: {
-              '& .MuiInputAdornment-positionEnd': {
-                marginLeft: 0,
-              },
-            },
           }}
+        />
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={isAdmin}
+              onChange={(e) => setIsAdmin(e.target.checked)}
+            />
+          }
+          label="Admin"
+          sx={{ mt: 1 }}
         />
 
         <Button

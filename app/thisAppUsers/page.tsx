@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Box, Button, Typography } from '@mui/material'
+import { Box, Button, Checkbox, Typography } from '@mui/material'
 import { DataGrid, GridColDef } from '@mui/x-data-grid'
 
 export default function ThisAppUsers() {
@@ -12,10 +12,11 @@ export default function ThisAppUsers() {
         const res = await fetch('/api/getThisAppUser')
         const data = await res.json()
 
-        const formatted = data.users.map((email: string, index: number) => ({
+        const formatted = data.users.map((item: any, index: number) => ({
           id: index + 1,
           sno: index + 1,
-          email,
+          email: item.email,
+          isAdmin: item.isAdmin
         }))
 
         setRows(formatted)
@@ -28,6 +29,23 @@ export default function ThisAppUsers() {
   const columns: GridColDef[] = [
     { field: 'sno', headerName: 'S.No.', width: 90 },
     { field: 'email', headerName: 'Email', flex: 1 },
+    {
+      field: 'isAdmin',
+      headerName: 'Is Admin ?',
+      width: 130,
+      renderCell: ({ row }) => (
+        <Checkbox
+          checked={row.isAdmin}
+          disabled
+          sx={{
+            color: row.isAdmin ? 'green' : 'grey.400',
+            '&.Mui-checked': {
+              color: 'green',
+            },
+          }}
+        />
+      ),
+    },
     {
     field: 'actions',
     headerName: 'Actions',
