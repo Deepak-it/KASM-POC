@@ -22,7 +22,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [region, setRegion] = useState('us-east-2')
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({})
-  console.log(session, 'session')
   /* ---------- api ---------- */
   const fetchPocs = async () => {
     setLoading(true)
@@ -114,8 +113,6 @@ export default function Home() {
 
   /* ---------- actions ---------- */
 
-  const onView = (row) => console.log('View', row)
-
   const onStart = (row) => startStopInstance(row.instanceId, '', 'start')
 
   const onStop = (row) => startStopInstance(row.instanceId, '', 'stop')
@@ -151,7 +148,6 @@ export default function Home() {
       flex: 1.5,
       renderCell: ({ row }) => {
         const status = row.kasmStatus
-        console.log(status, '1234')
         return (
           <div style={{ display: 'flex' }}>
             <div style={{ marginRight: '10px' }}>{row.url}</div>
